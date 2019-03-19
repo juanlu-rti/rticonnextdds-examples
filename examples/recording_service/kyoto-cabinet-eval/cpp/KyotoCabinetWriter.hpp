@@ -103,7 +103,7 @@ private:
 class PubDiscoveryKyotoCabinetWriter :
         public rti::recording::storage::PublicationStorageWriter {
 public:
-    PubDiscoveryKyotoCabinetWriter(std::ofstream& pub_file);
+    PubDiscoveryKyotoCabinetWriter(const std::string& pub_filename);
     ~PubDiscoveryKyotoCabinetWriter();
 
     void store(
@@ -112,7 +112,7 @@ public:
 
 private:
 
-    std::ofstream& pub_file_;
+    std::string pub_filename_;
 };
 
 } // namespace cpp_example

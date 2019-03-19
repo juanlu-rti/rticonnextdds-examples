@@ -42,7 +42,7 @@ target_link_libraries(
     RTIConnextDDS::routing_service_infrastructure
     RTIConnextDDS::cpp2_api
     ${CONNEXTDDS_EXTERNAL_LIBS}
-    "${kyoto_cabinet_lib}
+    "${kyoto_cabinet_lib}"
 )
 
 target_include_directories(

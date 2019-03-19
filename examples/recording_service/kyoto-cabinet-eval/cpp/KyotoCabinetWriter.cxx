@@ -89,7 +89,7 @@ KyotoCabinetWriter::create_stream_writer(
 rti::recording::storage::PublicationStorageWriter *
 KyotoCabinetWriter::create_publication_writer()
 {
-    return new PubDiscoveryKyotoCabinetWriter(pub_file_);
+    return new PubDiscoveryKyotoCabinetWriter(pub_file_name_);
 }
 
 void KyotoCabinetWriter::delete_stream_writer(
@@ -156,7 +156,7 @@ void KyotoCabinetStreamWriter::store(
         const dds::core::xtypes::DynamicData& sample = *(sample_seq[i]);
         rti::core::xtypes::to_cdr_buffer(buffer, sample);
         if (!data_file_.add(
-                static_cast<char *>(timestamp),
+                reinterpret_cast<char *>(&timestamp),
                 sizeof(int64_t),
                 buffer.data(),
                 buffer.size())) {
@@ -172,8 +172,8 @@ void KyotoCabinetStreamWriter::store(
 }
 
 PubDiscoveryKyotoCabinetWriter::PubDiscoveryKyotoCabinetWriter(
-        std::ofstream& pub_file) :
-    pub_file_(pub_file)
+        const std::string& pub_filename) :
+    pub_filename_(pub_filename)
 {
 }
 
