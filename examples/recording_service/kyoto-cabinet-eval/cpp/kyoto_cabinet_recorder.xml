@@ -27,7 +27,7 @@
                         </element>
                         <element>
                             <name>example.kyoto_cabinet.pub_filename</name>
-                            <value>dcpspublication.dat-</value>
+                            <value>dcpspublication.dat</value>
                         </element>
                     </value>
                 </property>

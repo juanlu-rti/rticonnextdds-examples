@@ -10,7 +10,12 @@
  * use or inability to use the software.
  */
 
+#include <memory>
+
+#include <dds_c/dds_c_typeobject.h>
+
 #include "KyotoCabinetWriter.hpp"
+#include "ReducedDCPSPublication.hpp"
 
 #define NANOSECS_PER_SEC 1000000000ll
 
@@ -167,7 +172,6 @@ void KyotoCabinetStreamWriter::store(
             std::cerr << log_msg.str();
         }
     }
-
     data_file_.end_transaction();
 }
 
@@ -175,10 +179,17 @@ PubDiscoveryKyotoCabinetWriter::PubDiscoveryKyotoCabinetWriter(
         const std::string& pub_filename) :
     pub_filename_(pub_filename)
 {
+    if (!pub_file_.open(pub_filename_)) {
+        std::stringstream log_msg;
+        log_msg << "Failed to open Kyoto Cabinet HashDB file: "
+                << pub_filename_;
+        throw std::runtime_error(log_msg.str());
+    }
 }
 
 PubDiscoveryKyotoCabinetWriter::~PubDiscoveryKyotoCabinetWriter()
 {
+    pub_file_.close();
 }
 
 void PubDiscoveryKyotoCabinetWriter::store(
@@ -186,6 +197,11 @@ void PubDiscoveryKyotoCabinetWriter::store(
         const std::vector<dds::sub::SampleInfo *>& info_seq)
 {
     using namespace dds::sub;
+
+    ReducedDCPSPublication reduced_sample;
+    std::vector<char> buffer(2048);
+
+    pub_file_.begin_transaction();
 
     const int32_t count = sample_seq.size();
     for (int32_t i = 0; i < count; ++i) {
@@ -195,10 +211,67 @@ void PubDiscoveryKyotoCabinetWriter::store(
                 (int64_t) sample_info->reception_timestamp().sec()
                 * NANOSECS_PER_SEC;
         timestamp += sample_info->reception_timestamp().nanosec();
-
-        // TODO
+        dds::topic::PublicationBuiltinTopicData& sample = *(sample_seq[i]);
+        reduced_sample.valid_data(sample_info.valid());
+        if (sample_info.valid()) {
+            reduced_sample.topic_name(sample.topic_name());
+            reduced_sample.type_name(sample.type_name());
+            const dds::core::optional<dds::core::xtypes::DynamicType> type =
+                    sample->type();
+            if (type.is_set()) {
+                const dds::core::xtypes::DynamicType& dynamic_type = type.get();
+                const DDS_TypeCode& native_type = dynamic_type.native();
+                DDS_TypeObject *type_object =
+                        DDS_TypeObject_create_from_typecode(&native_type);
+                if (type_object == NULL) {
+                    std::stringstream log_msg;
+                    log_msg << "Failed to create type-object from type-code"
+                            << std::endl;
+                    log_msg << "    Topic name : " << sample.topic_name()
+                            << std::endl;
+                    log_msg << "    Type name  : " << sample.type_name()
+                            << std::endl;
+                    throw std::runtime_error(log_msg.str());
+                }
+                std::shared_ptr<DDS_TypeObject> type_object_ptr(
+                        type_object,
+                        DDS_TypeObject_delete);
+                uint32_t type_object_buffer_len =
+                        DDS_TypeObject_get_serialized_size(type_object);
+                std::vector<uint8_t> typeobject_buffer(type_object_buffer_len);
+                if (DDS_TypeObject_serialize(
+                        type_object,
+                        (char *) &(typeobject_buffer[0]),
+                        &type_object_buffer_len) != DDS_RETCODE_OK) {
+                    std::stringstream log_msg;
+                    log_msg << "Failed to serialize type-object"
+                            << std::endl;
+                    log_msg << "    Topic name : " << sample.topic_name()
+                            << std::endl;
+                    log_msg << "    Type name  : " << sample.type_name()
+                            << std::endl;
+                    throw std::runtime_error(log_msg.str());
+                }
+                reduced_sample.type(typeobject_buffer);
+            }
+        }
+        dds::topic::topic_type_support<ReducedDCPSPublication>::to_cdr_buffer(
+                buffer,
+                reduced_sample);
+        if (!pub_file_.add(
+                reinterpret_cast<char *>(&timestamp),
+                sizeof(int64_t),
+                buffer.data(),
+                buffer.size())) {
+            std::stringstream log_msg;
+            log_msg << "Failed to add value to file:" << std::endl
+                    << "    file path : " << pub_file_.path()  << std::endl
+                    << "    value     : " << timestamp << std::endl ;
+            std::cerr << log_msg.str();
+        }
     }
+    pub_file_.end_transaction();
 }
 
-} // namespace cpp_example
+} // namespace kyoto_cabinet
 

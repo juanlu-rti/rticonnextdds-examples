@@ -113,6 +113,8 @@ public:
 private:
 
     std::string pub_filename_;
+
+    kyotocabinet::HashDB pub_file_;
 };
 
 } // namespace cpp_example
